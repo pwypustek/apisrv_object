@@ -130,7 +130,7 @@ async function main(_param: any, param2: any) {
           await client.send({
             from: currConJSON.instance.phototag.sender.name,
             to: param2.params.user,
-            subject: "Hasło zostało zresetowane",
+            subject: "photoTag: Hasło zostało zresetowane",
             content: text,
           });
 
@@ -171,6 +171,21 @@ async function sessionCreate(params: { cwid: any; user: any; l10n: any; wrkst: a
   }
 }
 
+async function sessionCheck(sessionId: string, cwid: string): Promise<boolean> {
+  try {
+    await Deno.lstat(
+      currConJSON.sessionDir + "/" + sessionId + "." +
+        cwid + "/session.json",
+    );
+    console.log("exists!");
+
+    return true;
+  } catch (err) {
+    console.log(err);
+    return false;
+  }
+}
+
 async function hash(requestParams: any, _options: any) {
   let h;
   let data, hashArray, hashHex, encoder;
@@ -191,4 +206,4 @@ async function hash(requestParams: any, _options: any) {
   return hashHex;
 }
 
-export { main };
+export { main, sessionCheck };
