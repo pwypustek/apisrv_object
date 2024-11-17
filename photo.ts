@@ -3,6 +3,7 @@ import { format } from "https://deno.land/std@0.224.0/datetime/format.ts";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 import { walk } from "https://deno.land/std@0.224.0/fs/mod.ts";
 import { sessionCheck } from "./auth.ts";
+import { Image } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 async function main(_param: any, param2: any) {
   try {
@@ -30,7 +31,9 @@ async function main(_param: any, param2: any) {
                 const imageEntry of Deno.readDir(`${path}/${dirEntry.name}`)
               ) {
                 if (
-                  imageEntry.isFile /*&& imageEntry.name.indexOf(".jpg") >= 0*/
+                  imageEntry.isFile &&
+                  imageEntry.name.indexOf("_thumbnail.") >=
+                    0 /*&& imageEntry.name.indexOf(".jpg") >= 0*/
                 ) {
                   countImage++;
                 }
@@ -47,7 +50,7 @@ async function main(_param: any, param2: any) {
           return { tags: foundFolders };
         } catch (e) {
           console.log(e);
-          throw new Error("Błąd upload");
+          throw new Error("Błąd upload #98723798");
         }
 
       case "tag_create":
@@ -58,7 +61,7 @@ async function main(_param: any, param2: any) {
           return { "ok": true };
         } catch (e) {
           console.log(e);
-          throw new Error("Błąd upload");
+          throw new Error("Błąd upload #9874978");
         }
 
       case "tag_update":
@@ -71,7 +74,7 @@ async function main(_param: any, param2: any) {
           return { "ok": true };
         } catch (e) {
           console.log(e);
-          throw new Error("Błąd upload");
+          throw new Error("Błąd upload #9876797234");
         }
 
       case "tag_delete":
@@ -86,7 +89,7 @@ async function main(_param: any, param2: any) {
           return { "ok": true };
         } catch (e) {
           console.log(e);
-          throw new Error("Błąd upload");
+          throw new Error("Błąd upload #9873987");
         }
 
       case "upload":
@@ -110,8 +113,19 @@ async function main(_param: any, param2: any) {
           const random = format(date, "yyyy-MM-dd_HHmmss_SSS");
           const path = `./config/file/${user}/${tag}`;
           await Deno.mkdir(path, { recursive: true });
-          const filename = `${path}/photo_${random}.jpg`;
+          let filename = `${path}/${param2.params.filename}.jpg`; //`${path}/photo_${random}.jpg`;
+          if ((await fileExists(filename))) {
+            console.log(
+              `Plik zdjęcia już istnieje, dodaję losowy string do nazwy pliku ${filename}`,
+            );
+            filename += `_${random}`;
+          }
           await Deno.writeFile(filename, binaryData);
+          await createThumbnail(
+            filename,
+            `${filename.replace(/.jpg/, "")}_thumbnail.jpg`,
+            200,
+          );
           console.log(`Zapisano plik: ${filename}`);
         } catch (e) {
           console.log(e);
@@ -120,22 +134,73 @@ async function main(_param: any, param2: any) {
 
       case "browse":
         try {
-          const foundElements: string[] = [];
+          const foundElements: any[] = [];
           const path =
             `./config/file/${param2.params.user}/${param2.params.tag}/`;
           for await (const dirEntry of Deno.readDir(path)) {
             //if (dirEntry.isDirectory && dirEntry.name.indexOf("_deleted_") <= 0) {
-            const fileData = await Deno.readFile(
-              `./config/file/${param2.params.user}/${param2.params.tag}/${dirEntry.name}`,
-            );
-            //const base64String = btoa(String.fromCharCode(...fileData));
-            const base64String = encodeBase64(fileData);
-            foundElements.push(base64String);
+            if (dirEntry.isFile) {
+              let fileData: any;
+              if (dirEntry.name.indexOf("_thumbnail.") >= 0) {
+                // ok
+                fileData = await Deno.readFile(
+                  `./config/file/${param2.params.user}/${param2.params.tag}/${dirEntry.name}`,
+                );
+                const base64String = encodeBase64(fileData);
+                foundElements.push({
+                  name: dirEntry.name,
+                  base64String: base64String,
+                });
+              } else {
+                if (
+                  await fileExists(
+                    `./config/file/${param2.params.user}/${param2.params.tag}/${
+                      dirEntry.name.replace(/.jpg/, "")
+                    }_thumbnail.jpg`,
+                  )
+                ) {
+                  // ok, jest thumbnail to pomijamy
+                } else {
+                  // brak thumbnail, trzeba wygenerować
+                  await createThumbnail(
+                    `./config/file/${param2.params.user}/${param2.params.tag}/${dirEntry.name}`,
+                    `./config/file/${param2.params.user}/${param2.params.tag}/${
+                      dirEntry.name.replace(/.jpg/, "")
+                    }_thumbnail.jpg`,
+                    200,
+                  );
+                  fileData = await Deno.readFile(
+                    `./config/file/${param2.params.user}/${param2.params.tag}/${
+                      dirEntry.name.replace(/.jpg/, "")
+                    }_thumbnail.jpg`,
+                  );
+                  const base64String = encodeBase64(fileData);
+                  foundElements.push({
+                    name: `${dirEntry.name.replace(/.jpg/, "")}_thumbnail.jpg`,
+                    base64String: base64String,
+                  });
+                }
+              }
+            }
           }
           return { images: foundElements };
         } catch (e) {
           console.log(e);
-          throw new Error("Błąd upload");
+          throw new Error("Błąd upload #987234978");
+        }
+
+      case "fullImage":
+        try {
+          const path =
+            `./config/file/${param2.params.user}/${param2.params.tag}/${
+              param2.params.name.replace(/_thumbnail.jpg/, ".jpg")
+            }`;
+          const fileData = await Deno.readFile(path);
+          const base64String = encodeBase64(fileData);
+          return { fullImage: base64String };
+        } catch (e) {
+          console.log(e);
+          throw new Error("Błąd upload #987234978");
         }
 
       case "server_ls":
@@ -144,7 +209,6 @@ async function main(_param: any, param2: any) {
             // const path =
             //   `/media/user/k/src/x/backend/apisrv/config/file/test2@test.com`;
             const path = `${Deno.cwd()}/config/file/test2@test.com`;
-            debugger;
             const tree = await buildDirectoryTree(path);
             // await Deno.writeTextFile(
             //   `./images_file_list.json`,
@@ -161,7 +225,6 @@ async function main(_param: any, param2: any) {
 
       case "client_ls":
         try {
-          debugger;
           const username = `test2@test.com`;
           const result = await graphqlClient(`
             query {
@@ -172,7 +235,7 @@ async function main(_param: any, param2: any) {
           return { ret: result };
         } catch (e) {
           console.log(e);
-          throw new Error("Błąd upload");
+          throw new Error("Błąd upload #987243987");
         }
 
       default:
@@ -181,7 +244,8 @@ async function main(_param: any, param2: any) {
     }
   } catch (e) {
     console.log(e);
-    return { "ok": false, "info": "error" };
+    //return { "ok": false, "info": "error" };
+    throw new Error(`Error #983298`);
   }
 
   return { "ok": true, "info": "ok" };
@@ -266,5 +330,55 @@ const graphqlClient = async (
     throw error;
   }
 };
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await Deno.lstat(path);
+    return true;
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) {
+      throw err;
+    }
+    console.log("not exists!");
+    return false;
+  }
+}
+
+async function createThumbnail(
+  inputPath: string,
+  outputPath: string,
+  maxSize: number,
+) {
+  try {
+    // Wczytaj obraz z pliku
+    const imageData = await Deno.readFile(inputPath);
+    const image = await Image.decode(imageData);
+
+    // Oblicz nową szerokość i wysokość, zachowując proporcje
+    const aspectRatio = image.width / image.height;
+    let newWidth, newHeight;
+
+    if (aspectRatio > 1) {
+      // Obraz jest szerszy niż wyższy
+      newWidth = maxSize;
+      newHeight = Math.round(maxSize / aspectRatio);
+    } else {
+      // Obraz jest wyższy niż szerszy
+      newHeight = maxSize;
+      newWidth = Math.round(maxSize * aspectRatio);
+    }
+
+    // Zmień rozmiar obrazu
+    const thumbnail = image.resize(newWidth, newHeight);
+
+    // Zakoduj miniaturkę jako plik (JPEG/PNG)
+    const encoded = await thumbnail.encodeJPEG(80); // Jakość 80%
+    await Deno.writeFile(outputPath, encoded);
+
+    console.log(`Miniaturka została zapisana jako ${outputPath}`);
+  } catch (err) {
+    console.error("Błąd podczas tworzenia miniaturki:", err);
+  }
+}
 
 export { main };

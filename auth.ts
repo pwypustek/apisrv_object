@@ -12,59 +12,88 @@ async function main(_param: any, param2: any) {
   try {
     console.log(`param2: ${JSON.stringify(param2)}`);
 
-    for (const value of ["./config/user", "./config/session", "./config/file"]) {
+    for (
+      const value of ["./config/user", "./config/session", "./config/file"]
+    ) {
       await Deno.mkdir(value, { recursive: true });
     }
 
     switch (param2.params.type) {
       case "login":
         try {
-          await Deno.lstat(currConJSON.userDir + "/" + param2.params.user + ".json");
+          await Deno.lstat(
+            currConJSON.userDir + "/" + param2.params.user + ".json",
+          );
           console.log("exists!");
 
-          const userContents = await Deno.readTextFile(currConJSON.userDir + "/" + param2.params.user + ".json");
+          const userContents = await Deno.readTextFile(
+            currConJSON.userDir + "/" + param2.params.user + ".json",
+          );
           const userJSON = JSON.parse(userContents);
 
-          const hashNew = await hash({ "password": param2.params.pass }, { "withHash": false });
+          const hashNew = await hash({ "password": param2.params.pass }, {
+            "withHash": false,
+          });
           console.log(hashNew);
 
           if (userJSON.hash === hashNew) {
-            const { error: error, sessionId: sessionId } = await sessionCreate(param2.params);
+            const { error: error, sessionId: sessionId, cwid: cwid } =
+              await sessionCreate(
+                param2.params,
+              );
             if (error) {
               alert(error);
               return { "ok": false, "info": "notok" };
             } else {
-              return { "ok": true, "info": "ok", "sessionId": sessionId };
+              return {
+                "ok": true,
+                "info": "ok",
+                "sessionId": sessionId,
+                "cwid": cwid,
+              };
             }
           } else {
-            return { "ok": false, "info": "Błąd logowania" };
+            //return { "ok": false, "info": "Błąd logowania" };
+            throw new Error("Błąd logowania");
           }
         } catch (err) {
           console.log(err);
-          return { "ok": false, "info": "Login error" };
+          throw new Error("Błąd logowania (2)");
         }
 
       case "session":
         try {
-          await Deno.lstat(currConJSON.sessionDir + "/" + param2.params.sessionId + "." + param2.params.cwid + "/session.json");
+          await Deno.lstat(
+            currConJSON.sessionDir + "/" + param2.params.sessionId + "." +
+              param2.params.cwid + "/session.json",
+          );
           console.log("exists!");
-          const sessionContents = await Deno.readTextFile(currConJSON.sessionDir + "/" + param2.params.sessionId + "." + param2.params.cwid + "/session.json");
+          const sessionContents = await Deno.readTextFile(
+            currConJSON.sessionDir + "/" + param2.params.sessionId + "." +
+              param2.params.cwid + "/session.json",
+          );
           const sessionContentsJSON = JSON.parse(sessionContents);
           return { "ok": true, user: sessionContentsJSON.user };
         } catch (err) {
           console.log(err);
-          return { "ok": false, "info": "Session not exists" };
+          throw new Error("Session not exists");
         }
 
       case "logout":
         try {
-          await Deno.rename(currConJSON.sessionDir + "/" + param2.params.sessionId + "." + param2.params.cwid, currConJSON.sessionDir + "/" + param2.params.sessionId + "." + param2.params.cwid + ".inactive");
+          await Deno.rename(
+            currConJSON.sessionDir + "/" + param2.params.sessionId + "." +
+              param2.params.cwid,
+            currConJSON.sessionDir + "/" + param2.params.sessionId + "." +
+              param2.params.cwid + ".logged_out",
+          );
         } catch (err) {
           console.log(err);
-          return { "ok": false, "info": "Logout error" };
+          //return { "ok": false, "info": "Logout error" };
+          throw new Error("Logout error");
         }
         return { "ok": true };
-        
+
       case "register":
         try {
           if (param2.params.passNew) {
@@ -72,47 +101,73 @@ async function main(_param: any, param2: any) {
           } else {
             throw new Error("Register error");
           }
-          const hashNew = await hash({ "password": param2.params.passNew }, { "withHash": false });
+          const hashNew = await hash({ "password": param2.params.passNew }, {
+            "withHash": false,
+          });
           console.log(hashNew);
 
           const user = {
             hash: hashNew,
           };
 
-          await Deno.writeTextFile(`${currConJSON.userDir}/${param2.params.user}.json`, JSON.stringify(user, undefined, "  "), { createNew: true });
+          await Deno.writeTextFile(
+            `${currConJSON.userDir}/${param2.params.user}.json`,
+            JSON.stringify(user, undefined, "  "),
+            { createNew: true },
+          );
 
           // utworzenie domyślnych tagów
           const path = `./config/file/${param2.params.user}/`;
           await Deno.mkdir(`${path}/Faktury firma`, { recursive: true });
           await Deno.mkdir(`${path}/Zakupy domowe`, { recursive: true });
 
-          const { error: error, sessionId: sessionId } = await sessionCreate(param2.params);
+          const { error: error, sessionId: sessionId, cwid: cwid } =
+            await sessionCreate(
+              param2.params,
+            );
           if (error) {
             console.log(error);
-            return { "ok": false, "info": "notok" };
+            throw new Error("Error #9872347");
           } else {
-            return { "ok": true, "info": "ok", "sessionId": sessionId };
+            return {
+              "ok": true,
+              "info": "ok",
+              "sessionId": sessionId,
+              "cwid": cwid,
+            };
           }
         } catch (e) {
-          console.log(e);
-          return { "ok": false, "info": "Register error" };
+          console.log(e);          
+          throw new Error("Register error");
         }
 
       case "forgot":
         try {
           const passNew = passwordGenerator();
           console.log(`passNew ${passNew}`);
-          const hashNew = await hash({ "password": passNew }, { "withHash": false });
+          const hashNew = await hash({ "password": passNew }, {
+            "withHash": false,
+          });
 
-          const userJson = JSON.parse(await Deno.readTextFile(`${currConJSON.userDir}/${param2.params.user}.json`));
+          const userJson = JSON.parse(
+            await Deno.readTextFile(
+              `${currConJSON.userDir}/${param2.params.user}.json`,
+            ),
+          );
           userJson.hash = hashNew;
 
           const time = format(new Date(), "yyyy-MM-dd_HHmmss_SSS");
           const pathLog = `./log/update_log/`;
           await Deno.mkdir(pathLog, { recursive: true });
-          await Deno.rename(`${currConJSON.userDir}/${param2.params.user}.json`, `${pathLog}/user_update_${param2.params.user}_${time}.json`);
+          await Deno.rename(
+            `${currConJSON.userDir}/${param2.params.user}.json`,
+            `${pathLog}/user_update_${param2.params.user}_${time}.json`,
+          );
 
-          await Deno.writeTextFile(`${currConJSON.userDir}/${param2.params.user}.json`, JSON.stringify(userJson, undefined, "  "));
+          await Deno.writeTextFile(
+            `${currConJSON.userDir}/${param2.params.user}.json`,
+            JSON.stringify(userJson, undefined, "  "),
+          );
 
           const text = `Login: ${param2.params.user}\nNowe hasło: ${passNew}`;
           const client = new SMTPClient({
@@ -139,7 +194,7 @@ async function main(_param: any, param2: any) {
           return { "ok": true, "info": "ok" };
         } catch (e) {
           console.log(e);
-          return { "ok": false, "info": "Retrieve login error" };
+          throw new Error("Retrieve login error");
         }
 
       default:
@@ -147,24 +202,34 @@ async function main(_param: any, param2: any) {
     }
   } catch (e) {
     console.log(e);
-    return { "error": true, "info": "error" };
+    //return { "error": true, "info": "error" };
+    throw new Error("Error #987243978");
   }
 }
 
-async function sessionCreate(params: { cwid: any; user: any; l10n: any; wrkst: any }) {
+async function sessionCreate(
+  params: { cwid: any; user: any; l10n: any; wrkst: any },
+) {
   try {
     const sessionId = crypto.randomUUID();
     console.log("Random UUID:", sessionId);
 
-    await Deno.mkdir(currConJSON.sessionDir + "/" + sessionId + "." + params.cwid, { recursive: true });
+    await Deno.mkdir(
+      currConJSON.sessionDir + "/" + sessionId + "." + params.cwid,
+      { recursive: true },
+    );
 
     const userFileContents = {
       "user": params.user,
       "l10n": params.l10n,
       "wrkst": params.wrkst,
     };
-    await Deno.writeTextFile(currConJSON.sessionDir + "/" + sessionId + "." + params.cwid + "/session.json", JSON.stringify(userFileContents, null, "\t"));
-    return { sessionId: sessionId };
+    await Deno.writeTextFile(
+      currConJSON.sessionDir + "/" + sessionId + "." + params.cwid +
+        "/session.json",
+      JSON.stringify(userFileContents, null, "\t"),
+    );
+    return { sessionId: sessionId, cwid: params.cwid };
   } catch (err) {
     console.log(err);
     return { error: "Error create session" };
